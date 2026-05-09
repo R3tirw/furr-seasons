@@ -54,7 +54,19 @@ async function renderPets() {
     renderRows(pets.filter(p => p.name.toLowerCase().includes(q) || (p.breed||'').toLowerCase().includes(q)));
   });
 
-  const dogBreeds = ['Labrador','Golden Retriever','German Shepherd','Beagle','Poodle','Bulldog','Rottweiler','Boxer','Dachshund','Shih Tzu','Pomeranian','Indie / Mixed','Other'];
+  const dogBreeds = [
+  'Labrador','Golden Retriever','German Shepherd','Beagle','Poodle',
+  'Bulldog','Rottweiler','Boxer','Dachshund','Shih Tzu','Pomeranian',
+  'Doberman','Dalmatian','Husky','Malamute','Great Dane','Saint Bernard',
+  'Border Collie','Australian Shepherd','Cocker Spaniel','Springer Spaniel',
+  'Cavalier King Charles','Bichon Frise','Maltese','Yorkshire Terrier',
+  'Miniature Schnauzer','Lhasa Apso','Chow Chow','Shar Pei','Akita',
+  'Shiba Inu','Samoyed','Weimaraner','Vizsla','Rhodesian Ridgeback',
+  'Basset Hound','Bloodhound','Greyhound','Whippet','Irish Setter',
+  'Gordon Setter','Pointer','Flat-Coated Retriever','Newfoundland',
+  'Bernese Mountain Dog','Leonberger','Cane Corso','Mastiff',
+  'French Bulldog','Boston Terrier','Pug','Chihuahua','Indie / Mixed'
+];
 
   function petForm(p = {}) {
     return `
@@ -72,10 +84,11 @@ async function renderPets() {
         </div>
         <div class="form-group">
           <label>Breed</label>
-          <select id="f-breed">
-            <option value="">Select…</option>
-            ${dogBreeds.map(b => `<option value="${b}" ${p.breed===b?'selected':''}>${b}</option>`).join('')}
-          </select>
+          <input type="text" id="f-breed" value="${p.breed||''}" 
+            placeholder="Type or pick a breed…" list="breed-list" autocomplete="off" />
+          <datalist id="breed-list">
+            ${dogBreeds.map(b => `<option value="${b}">`).join('')}
+          </datalist>
         </div>
         <div class="form-group">
           <label>Gender</label>
