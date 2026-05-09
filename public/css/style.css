@@ -175,9 +175,11 @@ nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; flex: 1;
 
 /* ── MAIN CONTENT ── */
 .main-content {
-  margin-left: var(--sidebar-w);
+  grid-column: 2;
+  min-width: 0;
   padding: 32px 36px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .page { display: none; }
