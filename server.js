@@ -19,6 +19,16 @@ const DB_PATH = isProd
   ? '/app/data/furr-seasons.db'
   : path.join(__dirname, 'furr-seasons.db');
 
+// One-time migration: copy old db to volume if new one doesn't exist yet
+if (isProd) {
+  const oldPath = '/app/furr-seasons.db';
+  if (!fs.existsSync(DB_PATH) && fs.existsSync(oldPath)) {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(oldPath, DB_PATH);
+    console.log('✓ Migrated database to persistent volume');
+  }
+}
 // ── ROOMS ────────────────────────────────────────────────────────────────────
 const ROOMS = [
   ...['A1','A2','A3'].map(id => ({ id, type:'Apartment', rate:2100 })),
