@@ -19,6 +19,11 @@ const DB_PATH = isProd
   ? '/app/data/furr-seasons.db'
   : path.join(__dirname, 'furr-seasons.db');
 
+if (isProd && !fs.existsSync('/app/data/furr-seasons.db') && fs.existsSync('/app/furr-seasons.db')) {
+  fs.mkdirSync('/app/data', { recursive: true });
+  fs.copyFileSync('/app/furr-seasons.db', '/app/data/furr-seasons.db');
+  console.log('✓ Migrated database to volume');
+}
 // One-time migration: copy old db to volume if new one doesn't exist yet
 if (isProd) {
   const oldPath = '/app/furr-seasons.db';
