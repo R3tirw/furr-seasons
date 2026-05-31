@@ -14,7 +14,9 @@ const fs           = require('fs');
 const app    = express();
 const PORT   = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === 'production';
-const DB_PATH = path.join(__dirname, 'furr-seasons.db');
+const DB_PATH = process.env.NODE_ENV === 'production'
+  ? '/app/data/furr-seasons.db'
+  : path.join(__dirname, 'furr-seasons.db');
 
 // ─────────────────────────────────────────────
 // SECURITY: Helmet — sets 15+ secure HTTP headers
