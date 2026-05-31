@@ -459,12 +459,12 @@ app.post('/api/bookings', requireAuth, [
 
   const id = uuidv4();
   const now = new Date().toISOString();
-  run(`INSERT INTO bookings VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id,pet_id,owner_id,staff_id||null,check_in,check_out||null,
+  run(`INSERT INTO bookings (id,pet_id,owner_id,staff_id,check_in,check_out,checkin_time,checkout_time,status,status_confirmed_at,status_checkedin_at,status_checkedout_at,status_cancelled_at,booking_type,room_id,kennel,num_dogs,rate,notes,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    [id,pet_id||null,owner_id||null,staff_id||null,check_in,check_out||null,
      checkin_time||null,checkout_time||null,
      'confirmed',now,null,null,null,
      booking_type,room_id,room_id,
-     num_dogs||1,rate||null,notes,now]);
+     num_dogs||1,rate||null,notes||'',now]);
 
   // Auto-generate draft invoice
   const bookingForInvoice = {booking_type,room_id,check_in,check_out,rate,num_dogs:num_dogs||1};
