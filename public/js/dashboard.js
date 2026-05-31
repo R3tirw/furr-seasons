@@ -2,44 +2,60 @@ async function renderDashboard() {
   const page = document.getElementById('page-dashboard');
   page.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text2)">Loading…</div>';
 
-  const [stats, bookings, invoices] = await Promise.all([
-    api.get('/stats'), api.get('/bookings'), api.get('/invoices')
+  const [stats, todayData] = await Promise.all([
+    api.get('/stats'),
+    api.get('/stats/today-rooms')
   ]);
+  if(!stats||!todayData) return;
 
   const today = new Date().toISOString().split('T')[0];
-  const active = bookings.filter(b => b.status === 'confirmed' && b.check_out >= today);
-  const checkins = bookings.filter(b => b.check_in && b.check_in.startsWith(today));
-  const checkouts = bookings.filter(b => b.check_out && b.check_out.startsWith(today));
-  const unpaid = invoices.filter(i => i.status === 'unpaid').slice(0, 6);
+  const { rooms, bookings } = todayData;
 
-  // Kennel grid — 20 slots
-  const kennelMap = {};
-  active.forEach(b => { if (b.kennel) kennelMap[b.kennel] = b; });
+  // Categorise bookings
+  const expected  = bookings.filter(b => b.status==='confirmed' && b.check_in===today);
+  const checkedIn = bookings.filter(b => b.status==='checked-in');
+  const dueOut    = bookings.filter(b => b.status==='checked-in' && b.check_out===today);
 
-  const pct = (stats.active_bookings / MAX_CAPACITY) * 100;
-  const capClass = pct >= 100 ? 'critical' : pct >= 75 ? 'warn' : '';
+  // Build room status map
+  const roomMap = {};
+  bookings.forEach(b => {
+    if(!roomMap[b.room_id]) roomMap[b.room_id] = [];
+    roomMap[b.room_id].push(b);
+  });
 
-  // Build kennel cells for named kennels + free slots
-  const usedKennels = active.map(b => b.kennel).filter(Boolean);
-  const freeCount = MAX_CAPACITY - stats.active_bookings;
+  // Room grid cells
+  let roomCells = '';
+  rooms.forEach(r => {
+    const rBookings = roomMap[r.id] || [];
+    const checkinB  = rBookings.find(b=>b.status==='checked-in');
+    const expectedB = rBookings.find(b=>b.status==='confirmed'&&b.check_in===today);
+    const dueOutB   = rBookings.find(b=>b.status==='checked-in'&&b.check_out===today);
+    const futureB   = rBookings.find(b=>b.status==='confirmed'&&b.check_in>today);
 
-  let kennelCells = '';
-  for (let i = 1; i <= MAX_CAPACITY; i++) {
-    const label = 'K' + i;
-    const b = kennelMap[label];
-    if (b) {
-      kennelCells += `<div class="kennel-cell occupied" title="${b.pet_name} — ${b.owner_name}">
-        <span class="kennel-icon">🐕</span>
-        <span class="kennel-name">${b.pet_name}</span>
-        <span class="kennel-num">${label}</span>
-      </div>`;
-    } else {
-      kennelCells += `<div class="kennel-cell">
-        <span class="kennel-icon" style="opacity:0.25">🏠</span>
-        <span class="kennel-num">${label}</span>
-      </div>`;
+    let cellClass='room-cell', icon='🏠', label=r.id, sublabel='', color='';
+    if(dueOutB){
+      cellClass+=' room-dueout'; icon='🔵'; label=dueOutB.pet_name||r.id;
+      sublabel='Due out'; color='var(--info)';
+    } else if(checkinB){
+      cellClass+=' room-occupied'; icon='🐕'; label=checkinB.pet_name||r.id;
+      sublabel='Checked in'; color='var(--success)';
+    } else if(expectedB){
+      cellClass+=' room-expected'; icon='🟡'; label=expectedB.pet_name||r.id;
+      sublabel='Arriving today'; color='var(--accent-dark)';
+    } else if(futureB){
+      cellClass+=' room-future'; icon='📅'; label=r.id;
+      sublabel='Future booking';
     }
-  }
+
+    const typeTag = checkinB||expectedB ? `<span class="room-type-tag">${(checkinB||expectedB).booking_type==='overnight'?'OVN':checkinB||expectedB?'DAY':''}</span>` : '';
+
+    roomCells += `<div class="${cellClass}" title="${label}${sublabel?' — '+sublabel:''}">
+      <span class="room-icon">${icon}</span>
+      <span class="room-id">${r.id}</span>
+      <span class="room-pet">${label!==r.id?label:''}</span>
+      <span class="room-sub">${sublabel}</span>
+    </div>`;
+  });
 
   page.innerHTML = `
     <div class="page-header">
@@ -50,65 +66,97 @@ async function renderDashboard() {
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card capacity-stat ${capClass}">
+      <div class="stat-card">
         <div class="stat-label">Occupancy</div>
-        <div class="stat-value">${stats.active_bookings}<span style="font-size:18px;opacity:0.5"> / ${MAX_CAPACITY}</span></div>
-        <div class="stat-sub">${freeCount} kennel${freeCount !== 1 ? 's' : ''} free</div>
+        <div class="stat-value">${stats.checkedin_now}<span style="font-size:18px;opacity:0.5"> / ${MAX_CAPACITY}</span></div>
+        <div class="stat-sub">${stats.expected_today} arriving · ${stats.checkout_today} departing</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Check-ins Today</div>
-        <div class="stat-value">${stats.checkins_today}</div>
-        <div class="stat-sub">Expected arrivals</div>
+        <div class="stat-label">Arriving Today</div>
+        <div class="stat-value">${stats.expected_today}</div>
+        <div class="stat-sub">Confirmed bookings</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Check-outs Today</div>
-        <div class="stat-value">${stats.checkouts_today}</div>
-        <div class="stat-sub">Departures</div>
+        <div class="stat-label">Departing Today</div>
+        <div class="stat-value">${stats.checkout_today}</div>
+        <div class="stat-sub">Due to check out</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Revenue This Month</div>
-        <div class="stat-value" style="font-size:26px">${formatCurrency(stats.revenue_month)}</div>
-        <div class="stat-sub">${stats.unpaid_invoices} invoice${stats.unpaid_invoices !== 1 ? 's' : ''} pending</div>
+        <div class="stat-value" style="font-size:22px">${formatCurrency(stats.revenue_month)}</div>
+        <div class="stat-sub">Overnight ${formatCurrency(stats.revenue_overnight)} · Day ${formatCurrency(stats.revenue_day)}</div>
+      </div>
+    </div>
+
+    <div class="dashboard-legend">
+      <span class="legend-item"><span class="legend-dot" style="background:var(--success)"></span>Checked In</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>Arriving Today</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--info)"></span>Due to Check Out</span>
+      <span class="legend-item"><span class="legend-dot" style="background:var(--border)"></span>Available</span>
+      <span class="legend-item"><span class="legend-dot" style="background:#C8D0F0"></span>Future Booking</span>
+    </div>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-header">
+        <div class="card-title">🏠 Room Map — ${today}</div>
+        <span style="font-size:12px;color:var(--text2)">${stats.checkedin_now} occupied · ${MAX_CAPACITY-stats.checkedin_now} free</span>
+      </div>
+      <div class="room-type-section">
+        <div class="room-type-label">Apartments</div>
+        <div class="room-grid room-grid-3">${roomCells.split('</div>').slice(0,3).join('</div>')}</div>
+      </div>
+      <div class="room-type-section">
+        <div class="room-type-label">Suites</div>
+        <div class="room-grid room-grid-5">${roomCells.split('</div>').slice(3,8).join('</div>')}</div>
+      </div>
+      <div class="room-type-section">
+        <div class="room-type-label">Cabins</div>
+        <div class="room-grid room-grid-5">${roomCells.split('</div>').slice(8,18).join('</div>')}</div>
       </div>
     </div>
 
     <div class="cards-row">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">🏠 Kennel Map</div>
-          <span style="font-size:12px;color:var(--text2)">${stats.active_bookings} occupied · ${freeCount} free</span>
+      <div class="today-card">
+        <div class="today-label">🟡 Arriving Today</div>
+        <div class="today-items">
+          ${expected.length ? expected.map(b=>`
+            <div class="today-item">
+              <div class="today-dot" style="background:var(--accent)"></div>
+              <div>
+                <b>${b.pet_name||'—'}</b> · ${b.owner_name||'—'}<br>
+                <span style="font-size:11px;color:var(--text2)">${b.room_id} · ${BOOKING_TYPES[b.booking_type]||b.booking_type}
+                ${b.special_instructions?'<br><span style="color:#FF8C00">⚠ '+b.special_instructions+'</span>':''}</span>
+              </div>
+            </div>`).join('') : '<div style="color:var(--text2);font-size:13px">No arrivals today</div>'}
         </div>
-        <div class="kennel-grid">${kennelCells}</div>
       </div>
-
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="today-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
-          <div class="today-label">📥 Arriving Today</div>
-          <div class="today-items">
-            ${checkins.length
-              ? checkins.map(b => `<div class="today-item"><div class="today-dot"></div><span><b>${b.pet_name}</b> · ${b.owner_name} · Kennel ${b.kennel || '?'}</span></div>`).join('')
-              : '<div style="color:var(--text2);font-size:13px">No arrivals scheduled</div>'}
-          </div>
+      <div class="today-card">
+        <div class="today-label">🟢 Currently Boarded</div>
+        <div class="today-items">
+          ${checkedIn.length ? checkedIn.map(b=>`
+            <div class="today-item">
+              <div class="today-dot" style="background:var(--success)"></div>
+              <div>
+                <b>${b.pet_name||'—'}</b> · ${b.owner_name||'—'}<br>
+                <span style="font-size:11px;color:var(--text2)">${b.room_id} · Check-out ${formatDate(b.check_out)}
+                ${b.special_instructions?'<br><span style="color:#FF8C00">⚠ '+b.special_instructions+'</span>':''}</span>
+              </div>
+            </div>`).join('') : '<div style="color:var(--text2);font-size:13px">No dogs currently boarded</div>'}
         </div>
-        <div class="today-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
-          <div class="today-label">📤 Departing Today</div>
-          <div class="today-items">
-            ${checkouts.length
-              ? checkouts.map(b => `<div class="today-item"><div class="today-dot" style="background:var(--navy)"></div><span><b>${b.pet_name}</b> · ${b.owner_name}</span></div>`).join('')
-              : '<div style="color:var(--text2);font-size:13px">No departures today</div>'}
-          </div>
-        </div>
-        <div class="today-card" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius)">
-          <div class="today-label">🧾 Pending Invoices</div>
-          <div class="today-items">
-            ${unpaid.length
-              ? unpaid.map(i => `<div class="today-item"><div class="today-dot" style="background:#FF9900"></div><span><b>${i.owner_name || '—'}</b> · ${formatCurrency(i.total)}</span></div>`).join('')
-              : '<div style="color:var(--success);font-size:13px;font-weight:600">All invoices settled ✓</div>'}
-          </div>
+      </div>
+      <div class="today-card">
+        <div class="today-label">🔵 Departing Today</div>
+        <div class="today-items">
+          ${dueOut.length ? dueOut.map(b=>`
+            <div class="today-item">
+              <div class="today-dot" style="background:var(--info)"></div>
+              <div><b>${b.pet_name||'—'}</b> · ${b.owner_name||'—'}<br>
+              <span style="font-size:11px;color:var(--text2)">${b.room_id}</span></div>
+            </div>`).join('') : '<div style="color:var(--text2);font-size:13px">No departures today</div>'}
         </div>
       </div>
     </div>
   `;
 
-  updateCapacityBar(stats.active_bookings);
+  updateCapacityBar(stats.checkedin_now);
 }
