@@ -359,10 +359,15 @@ app.post('/api/pets', requireAuth, [
 ], validate, (req,res) => {
   const {owner_id,name,species,breed,age,weight,notes,special_instructions,arv_vaccinated,arv_expiry,kc_vaccinated,kc_expiry} = req.body;
   const id = uuidv4();
-  run(`INSERT INTO pets VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [id,owner_id,name,species,breed,age||null,weight||null,notes,special_instructions,
-     arv_vaccinated?1:0,arv_expiry||null,kc_vaccinated?1:0,kc_expiry||null,new Date().toISOString()]);
-  res.json({id});
+  try {
+    run(`INSERT INTO pets (id,owner_id,name,species,breed,age,weight,notes,special_instructions,arv_vaccinated,arv_expiry,kc_vaccinated,kc_expiry,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [id,owner_id||null,name,species||'Dog',breed||'',age||null,weight||null,notes||'',special_instructions||'',
+       arv_vaccinated?1:0,arv_expiry||null,kc_vaccinated?1:0,kc_expiry||null,new Date().toISOString()]);
+    res.json({id});
+  } catch(e) {
+    console.error('Pet insert error:', e.message);
+    res.status(500).json({error:'Failed to create dog: '+e.message});
+  }
 });
 
 app.put('/api/pets/:id', requireAuth, [param('id').isUUID(),
