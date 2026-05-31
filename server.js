@@ -308,7 +308,7 @@ app.post('/api/owners', requireAuth, [
 ], validate, (req,res) => {
   const {name,phone,email,address} = req.body;
   const id = uuidv4();
-  run('INSERT INTO owners VALUES (?,?,?,?,?,?)',[id,name,phone,email,address,new Date().toISOString()]);
+  run('INSERT INTO owners VALUES (?,?,?,?,?,?)',[id,name,phone||'',email||'',address||'',new Date().toISOString()]);
   res.json({id,name,phone,email,address});
 });
 
