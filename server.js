@@ -303,7 +303,7 @@ app.get('/api/owners/:id', requireAuth, [param('id').isUUID()], validate, (req,r
 app.post('/api/owners', requireAuth, [
   body('name').trim().notEmpty().isLength({max:100}).escape(),
   body('phone').optional({checkFalsy:true}).trim().isLength({max:20}),
-  body('email').optional({checkFalsy:true}).trim().isEmail().normalizeEmail(),
+  body('email').optional({checkFalsy:true}).trim().isLength({max:150}),
   body('address').optional({checkFalsy:true}).trim().isLength({max:300}).escape(),
 ], validate, (req,res) => {
   const {name,phone,email,address} = req.body;
